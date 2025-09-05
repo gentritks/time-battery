@@ -37,11 +37,12 @@
     .hidden{display:none!important}
 
     /* Countdown visuals */
+    .row{display:flex;align-items:center;gap:10px;justify-content:center}
     .count-meta{font-size:16px;line-height:1.6;color:var(--muted)}
     .countdown-big{font-size:clamp(32px,6vw,80px);font-weight:800;line-height:1.1;margin-top:4px}
-    .pbar{margin-top:14px;height:14px;background:#132033;border:1px solid #1b2330;border-radius:999px;overflow:hidden}
+    .pbar{position:relative;margin-top:14px;height:14px;background:#132033;border:1px solid #1b2330;border-radius:999px;overflow:hidden}
     .pfill{height:100%;width:0%;background:linear-gradient(90deg,#4da3ff,#29c759)}
-    .row{display:flex;align-items:center;gap:10px;justify-content:center}
+    .pcent{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:12px;color:#e6eef7;opacity:.9}
 
     /* Bell icon + animation for last 30s */
     .bell{width:28px;height:28px;opacity:.85}
@@ -102,13 +103,19 @@
             <div class="count-meta" id="nowLine">—</div>
           </div>
           <div class="countdown-big" id="bigTimer">—</div>
-          <div class="pbar"><div class="pfill" id="pfill"></div></div>
+          <div class="pbar">
+            <div class="pfill" id="pfill"></div>
+            <div class="pcent" id="pcent">0%</div>
+          </div>
           <div class="count-meta" id="nextLine" style="margin-top:8px;">—</div>
         </div>
       </div>
     </section>
 
-    <div class="footer">Tip: Bookmark this page to quickly check battery and class times in kiosk mode.</div>
+    <div class="footer">
+      Tip: Bookmark this page to quickly check your battery and class times in kiosk mode.
+      <br/>Note: Class countdowns are for reference and may be inaccurate.
+    </div>
   </main>
 
   <script>
@@ -172,9 +179,9 @@
             setFill(pct);
             boltEl.classList.toggle('hidden', !battery.charging);
             const timeStr = battery.charging
-              ? (battery.chargingTime === Infinity ? 'calculating…' : ('full in ' + humanTime(battery.chargingTime)))
-              : (battery.dischargingTime === Infinity ? 'calculating…' : ('left ' + humanTime(battery.dischargingTime)));
-            statusEl.textContent = (battery.charging ? 'Charging · ' : 'On battery · ') + timeStr;
+              ? (battery.chargingTime === Infinity ? '' : ('· full in ' + humanTime(battery.chargingTime)))
+              : (battery.dischargingTime === Infinity ? '' : ('· left ' + humanTime(battery.dischargingTime)));
+            statusEl.textContent = (battery.charging ? 'Charging ' : 'On battery ') + timeStr;
             srBattery.textContent = `Battery ${pct} percent ${battery.charging ? 'and charging' : ''}`;
             unsupportedEl.classList.add('hidden');
             statusEl.classList.remove('hidden');
@@ -205,7 +212,7 @@
         {name:'5th Block', start:'12:25', end:'13:30'},
         {name:'6th Block', start:'13:35', end:'14:45'},
       ];
-      // Friday (school ends after Block 3)
+      // Friday (no “day ends after this block” text—intentionally left blank)
       const fridaySchedule = [
         {name:'Homeroom', start:'08:00', end:'08:15'},
         {name:'1st Block', start:'08:20', end:'09:25'},
@@ -217,6 +224,7 @@
       const bigTimerEl = document.getElementById('bigTimer');
       const nextLineEl = document.getElementById('nextLine');
       const pfillEl = document.getElementById('pfill');
+      const pcentEl = document.getElementById('pcent');
       const bellEl = document.getElementById('bell');
 
       function parseHM(hm){
@@ -254,9 +262,11 @@
           nowLineEl.textContent = `${active.name} ends in`;
           bigTimerEl.textContent = humanClock(left);
           pfillEl.style.width = (done*100).toFixed(1) + '%';
+          pcentEl.textContent = Math.round(done*100) + '%';
           nextLineEl.textContent = next
             ? `Next: ${next.name} at ${next.s.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`
-            : (now.getDay() === 5 ? 'School day ends after this block.' : '');
+            : ''; // no “day ends…” text by request
+
           // Bell in last 30s
           if (left > 0 && left <= 30000) {
             bellEl.classList.remove('hidden');
@@ -270,13 +280,15 @@
           nowLineEl.textContent = `${next.name} starts in`;
           bigTimerEl.textContent = humanClock(until);
           pfillEl.style.width = '0%';
+          pcentEl.textContent = '0%';
           nextLineEl.textContent = `Starts at ${next.s.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
           bellEl.classList.add('hidden');
           bellEl.classList.remove('ring');
         } else {
-          nowLineEl.textContent = 'School day is over';
+          nowLineEl.textContent = 'No active classes';
           bigTimerEl.textContent = '—';
           pfillEl.style.width = '100%';
+          pcentEl.textContent = '100%';
           nextLineEl.textContent = '';
           bellEl.classList.add('hidden');
           bellEl.classList.remove('ring');
