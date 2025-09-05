@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Time & Battery</title>
-  <meta name="description" content="Large clock with battery status and class countdowns." />
+  <meta name="description" content="Large clock with battery status and class countdowns for kiosk mode." />
   <style>
     :root{
       --bg:#0b0f14; --fg:#e6eef7; --muted:#9db0c0;
@@ -14,30 +14,51 @@
     html,body{height:100%}
     body{
       margin:0;background:var(--bg);color:var(--fg);
-      font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+      font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial;
       display:flex;align-items:center;justify-content:center;padding:4vh 4vw;
     }
     .wrap{width:min(1100px,100%);text-align:center}
     .time{font-weight:700;letter-spacing:.02em;line-height:1}
     .time .clock{font-size:clamp(48px,16vw,160px)}
     .time .date{margin-top:.4rem;font-size:clamp(18px,3.8vw,28px);color:var(--muted)}
+
     .grid{display:grid;grid-template-columns:1fr;gap:22px;margin-top:36px}
     @media (min-width:700px){.grid{grid-template-columns:1fr 1fr}}
+
     .card{background:#101722;border:1px solid #1b2330;border-radius:16px;padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
     .label{text-transform:uppercase;font-size:12px;letter-spacing:.14em;color:var(--muted);margin-bottom:8px}
-    /* Battery */
+
+    /* Battery visuals */
     .battery{margin-inline:auto;width:clamp(240px,40vw,420px);height:120px;position:relative;display:flex;align-items:center;justify-content:center}
     .battery svg{width:100%;height:100%;display:block}
     .percent{font-size:clamp(24px,4.2vw,40px);font-weight:700}
     .status{margin-top:4px;color:var(--muted);font-size:14px}
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-    /* Countdowns */
-    .countdown-item{margin:6px 0;font-size:16px;line-height:1.6}
-    .countdown-item strong{color:var(--accent)}
+    .hidden{display:none!important}
+
+    /* Countdown visuals */
+    .count-meta{font-size:16px;line-height:1.6;color:var(--muted)}
+    .countdown-big{font-size:clamp(32px,6vw,80px);font-weight:800;line-height:1.1;margin-top:4px}
+    .pbar{margin-top:14px;height:14px;background:#132033;border:1px solid #1b2330;border-radius:999px;overflow:hidden}
+    .pfill{height:100%;width:0%;background:linear-gradient(90deg,#4da3ff,#29c759)}
+    .row{display:flex;align-items:center;gap:10px;justify-content:center}
+
+    /* Bell icon + animation for last 30s */
+    .bell{width:28px;height:28px;opacity:.85}
+    .ring{animation:ring 1s ease-in-out infinite}
+    @keyframes ring{
+      0%{transform:rotate(0deg)}
+      10%{transform:rotate(18deg)}
+      20%{transform:rotate(-14deg)}
+      30%{transform:rotate(10deg)}
+      40%{transform:rotate(-6deg)}
+      50%{transform:rotate(3deg)}
+      60%,100%{transform:rotate(0deg)}
+    }
+
     .footer{margin-top:28px;color:var(--muted);font-size:12px;opacity:.85}
     a{color:var(--accent);text-decoration:none}
     a:hover{text-decoration:underline}
-    .hidden{display:none!important}
   </style>
 </head>
 <body>
@@ -60,6 +81,7 @@
               <rect x="18" y="48" width="454" height="144" fill="#132033"/>
               <rect id="fill" x="18" y="48" width="0" height="144" fill="#29c759"/>
             </g>
+            <!-- charging bolt overlay -->
             <path id="bolt" class="hidden" d="M270 65 l-50 70 h40 l-20 70 l70 -95 h-40 l20 -45 z" fill="#ffffff" opacity=".9"/>
           </svg>
         </div>
@@ -72,18 +94,26 @@
       <!-- Class Countdowns -->
       <div class="card">
         <div class="label">Class Countdowns</div>
-        <div id="countdowns">
-          <div class="countdown-item">Initializing…</div>
+        <div>
+          <div class="row">
+            <svg id="bell" class="bell hidden" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 1 0-14 0v5l-2 2v1h20v-1l-2-2Z"/>
+            </svg>
+            <div class="count-meta" id="nowLine">—</div>
+          </div>
+          <div class="countdown-big" id="bigTimer">—</div>
+          <div class="pbar"><div class="pfill" id="pfill"></div></div>
+          <div class="count-meta" id="nextLine" style="margin-top:8px;">—</div>
         </div>
       </div>
     </section>
 
-    <div class="footer">Tip: Bookmark this page so you can quickly check your battery and class times in kiosk mode.</div>
+    <div class="footer">Tip: Bookmark this page to quickly check battery and class times in kiosk mode.</div>
   </main>
 
   <script>
     (function(){
-      // ------- Clock (device time; simple + offline-friendly) -------
+      // ---------- Clock (device time; simple + offline) ----------
       const clockEl = document.getElementById('clock');
       const dateEl  = document.getElementById('date');
       function safeFormatter(opts){ try { return new Intl.DateTimeFormat(undefined, opts); } catch(_) { return null; } }
@@ -97,7 +127,7 @@
       tickClock();
       setInterval(tickClock, 1000);
 
-      // ------- Battery (robust; handles missing/never-resolving API) -------
+      // ---------- Battery (robust; handles missing/never-resolving API) ----------
       const fillEl        = document.getElementById('fill');
       const percentEl     = document.getElementById('percent');
       const statusEl      = document.getElementById('bStatus');
@@ -131,7 +161,7 @@
             unsupportedEl.classList.remove('hidden');
             statusEl.classList.add('hidden');
           }
-        }, 5000); // if promise never resolves
+        }, 5000); // if promise never resolves in kiosk builds
 
         try {
           const battery = await navigator.getBattery();
@@ -164,8 +194,8 @@
       }
       initBattery();
 
-      // ------- Class Countdowns (Mon–Thu vs Friday) -------
-      const countdownsEl = document.getElementById('countdowns');
+      // ---------- Class Countdowns (Mon–Thu vs Friday) ----------
+      // Mon–Thu
       const weekdaySchedule = [
         {name:'Homeroom', start:'08:00', end:'08:15'},
         {name:'1st Block', start:'08:20', end:'09:25'},
@@ -175,15 +205,25 @@
         {name:'5th Block', start:'12:25', end:'13:30'},
         {name:'6th Block', start:'13:35', end:'14:45'},
       ];
+      // Friday (school ends after Block 3)
       const fridaySchedule = [
         {name:'Homeroom', start:'08:00', end:'08:15'},
         {name:'1st Block', start:'08:20', end:'09:25'},
         {name:'2nd Block', start:'09:30', end:'10:35'},
-        {name:'3rd Block', start:'10:40', end:'11:35'}, // then school ends
+        {name:'3rd Block', start:'10:40', end:'11:35'},
       ];
+
+      const nowLineEl = document.getElementById('nowLine');
+      const bigTimerEl = document.getElementById('bigTimer');
+      const nextLineEl = document.getElementById('nextLine');
+      const pfillEl = document.getElementById('pfill');
+      const bellEl = document.getElementById('bell');
+
       function parseHM(hm){
         const [H,M] = hm.split(':').map(Number);
-        const d = new Date(); d.setHours(H, M, 0, 0); return d;
+        const d = new Date();
+        d.setHours(H, M, 0, 0);
+        return d;
       }
       function humanClock(ms){
         if (ms <= 0) return '00:00';
@@ -191,9 +231,11 @@
         const pad = n => String(n).padStart(2,'0');
         return (h>0 ? pad(h)+':' : '') + pad(m)+':'+pad(s);
       }
+
       function updateCountdowns(){
         const now = new Date();
         const sched = (now.getDay() === 5) ? fridaySchedule : weekdaySchedule; // 0 Sun .. 6 Sat
+
         let active = null, next = null;
         for (let i=0;i<sched.length;i++){
           const s = parseHM(sched[i].start), e = parseHM(sched[i].end);
@@ -204,18 +246,41 @@
           }
           if (now < s) { next = { ...sched[i], s }; break; }
         }
-        let html = '';
+
         if (active){
-          html += `<div class="countdown-item"><strong>${active.name}</strong> finishes in ${humanClock(active.e - now)}</div>`;
-          if (next) html += `<div class="countdown-item">Next: ${next.name} at ${next.s.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
-          else html += `<div class="countdown-item">School day ends after this block.</div>`;
+          const total = active.e - active.s;
+          const left  = active.e - now;
+          const done  = Math.max(0, Math.min(1, (now - active.s) / total));
+          nowLineEl.textContent = `${active.name} ends in`;
+          bigTimerEl.textContent = humanClock(left);
+          pfillEl.style.width = (done*100).toFixed(1) + '%';
+          nextLineEl.textContent = next
+            ? `Next: ${next.name} at ${next.s.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`
+            : (now.getDay() === 5 ? 'School day ends after this block.' : '');
+          // Bell in last 30s
+          if (left > 0 && left <= 30000) {
+            bellEl.classList.remove('hidden');
+            bellEl.classList.add('ring');
+          } else {
+            bellEl.classList.add('hidden');
+            bellEl.classList.remove('ring');
+          }
         } else if (next){
-          html += `<div class="countdown-item"><strong>${next.name}</strong> starts in ${humanClock(next.s - now)}</div>`;
-          html += `<div class="countdown-item">Starts at ${next.s.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
+          const until = next.s - now;
+          nowLineEl.textContent = `${next.name} starts in`;
+          bigTimerEl.textContent = humanClock(until);
+          pfillEl.style.width = '0%';
+          nextLineEl.textContent = `Starts at ${next.s.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+          bellEl.classList.add('hidden');
+          bellEl.classList.remove('ring');
         } else {
-          html += `<div class="countdown-item">School day is over.</div>`;
+          nowLineEl.textContent = 'School day is over';
+          bigTimerEl.textContent = '—';
+          pfillEl.style.width = '100%';
+          nextLineEl.textContent = '';
+          bellEl.classList.add('hidden');
+          bellEl.classList.remove('ring');
         }
-        countdownsEl.innerHTML = html;
       }
       updateCountdowns();
       setInterval(updateCountdowns, 1000);
