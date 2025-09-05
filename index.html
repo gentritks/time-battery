@@ -104,7 +104,7 @@
       const updatedEl = document.getElementById('updated');
       const boltEl = document.getElementById('bolt');
 
-      // ---- Safe Intl helpers with fallbacks ----
+      // ------------------ TIME (server-synced with fallback) ------------------
       function safeFormatter(opts){
         try { return new Intl.DateTimeFormat(undefined, opts); }
         catch(_) { return null; }
@@ -113,17 +113,72 @@
       const fmtDate = safeFormatter({ weekday:'long', year:'numeric', month:'long', day:'numeric' });
       const fmtLong = safeFormatter({ hour: '2-digit', minute:'2-digit', second:'2-digit', hour12: false });
 
-      function updateClock(){
-        const now = new Date();
+      let offsetMs = 0;           // serverTime - deviceTime
+      let usingServer = false;    // whether server time is in use
+      let lastProvider = 'Device clock';
+
+      function displayNow(){
+        const now = new Date(Date.now() + offsetMs);
         clockEl.textContent = fmtTime ? fmtTime.format(now) : now.toLocaleTimeString();
         dateEl.textContent  = fmtDate ? fmtDate.format(now) : now.toLocaleDateString();
         ltEl.textContent    = fmtLong ? fmtLong.format(now) : now.toLocaleTimeString();
       }
 
+      function setUpdated(){ updatedEl.textContent = new Date().toLocaleTimeString(); }
+
+      function fetchWithTimeout(url, ms){
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), ms);
+        return fetch(url, { signal: ctrl.signal, cache: 'no-store' }).finally(() => clearTimeout(t));
+      }
+
+      async function getServerTime(){
+        const tz = (()=>{ try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch(_) { return null; } })();
+        const candidates = [
+          tz ? `https://worldtimeapi.org/api/timezone/${encodeURIComponent(tz)}` : 'https://worldtimeapi.org/api/ip',
+          tz ? `https://timeapi.io/api/Time/current/zone?timeZone=${encodeURIComponent(tz)}` : null,
+        ].filter(Boolean);
+
+        for(const url of candidates){
+          try{
+            const res = await fetchWithTimeout(url, 3500);
+            if(!res.ok) continue;
+            const data = await res.json();
+            // worldtimeapi: data.datetime; timeapi.io: data.dateTime
+            const iso = data.datetime || data.dateTime;
+            if(!iso) continue;
+            const serverDate = new Date(iso);
+            if(isNaN(serverDate)) continue;
+            // Calculate offset so updates keep ticking without re-fetching each second
+            offsetMs = serverDate.getTime() - Date.now();
+            usingServer = true;
+            lastProvider = new URL(url).hostname;
+            return true;
+          }catch(_){ /* try next provider */ }
+        }
+        // Fall back to device clock
+        offsetMs = 0;
+        usingServer = false;
+        lastProvider = 'Device clock';
+        return false;
+      }
+
+      async function syncClock(){
+        const ok = await getServerTime();
+        displayNow();
+        setUpdated();
+        // Announce where time comes from (only visually via Details > Local Time)
+        ltEl.title = usingServer ? `Synced with ${lastProvider}` : 'Using device clock';
+      }
+
+      // keep display smooth; resync every 10 minutes to correct drift
+      setInterval(displayNow, 1000);
+      setInterval(syncClock, 10 * 60 * 1000);
+
+      // ------------------ BATTERY ------------------
       function setFill(percent){
         const w = Math.max(0, Math.min(454 * (percent/100), 454));
         fillEl.setAttribute('width', w);
-        // Color thresholds
         let cssVar = '--ok';
         if(percent <= 20) cssVar = '--crit';
         else if(percent <= 40) cssVar = '--warn';
@@ -138,19 +193,12 @@
         return (h>0? h+"h ":"") + m + "m";
       }
 
-      function setUpdated(){
-        updatedEl.textContent = new Date().toLocaleTimeString();
-      }
-
       async function initBattery(){
-        // Fast path: API missing entirely
         if(!('getBattery' in navigator)){
           unsupportedEl.classList.remove('hidden');
           statusEl.classList.add('hidden');
           return;
         }
-
-        // Guard: if the underlying promise never resolves, show unsupported after a few seconds
         let rendered = false;
         const timeout = setTimeout(() => {
           if(!rendered){
@@ -158,12 +206,10 @@
             statusEl.classList.add('hidden');
           }
         }, 5000);
-
         try{
           const battery = await navigator.getBattery();
-
           function render(){
-            rendered = true; // mark resolved/updated
+            rendered = true;
             const pct = Math.round(battery.level * 100);
             percentEl.textContent = pct + '%';
             setFill(pct);
@@ -179,8 +225,6 @@
             unsupportedEl.classList.add('hidden');
             statusEl.classList.remove('hidden');
           }
-
-          // Initial + listeners
           render();
           battery.addEventListener('levelchange', render);
           battery.addEventListener('chargingchange', render);
@@ -196,17 +240,13 @@
       }
 
       function initInfo(){
-        try{
-          tzEl.textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
-        }catch(_){
-          tzEl.textContent = 'Local';
-        }
+        try{ tzEl.textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local'; }
+        catch(_){ tzEl.textContent = 'Local'; }
       }
 
-      // Kick things off
-      updateClock();
+      // ---- Boot ----
       initInfo();
-      setInterval(updateClock, 1000);
+      syncClock();      // initial server sync (with fallback)
       initBattery();
     })();
   </script>
