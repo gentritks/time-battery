@@ -78,9 +78,12 @@
       </div>
 
       <div class="card">
-        <div class="label">Details</div>
-        <div id="details" style="font-size:16px; line-height:1.6">
-          <div><strong>Timezone:</strong> <span id="tz">—</span></div>
+        <div class="label">Schedule</div>
+        <div style="font-size:18px; line-height:1.5">
+          <div id="nowBlock" style="font-weight:700; font-size:20px;">—</div>
+          <div id="countdown" style="font-size:36px; font-weight:800; margin-top:4px;">—</div>
+          <div id="nextBlock" class="status" style="margin-top:8px;">Next: —</div>
+        </div>
           <div><strong>Local Time:</strong> <span id="lt">—</span></div>
           <div><strong>Last Updated:</strong> <span id="updated">—</span></div>
         </div>
@@ -243,6 +246,84 @@
         try{ tzEl.textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local'; }
         catch(_){ tzEl.textContent = 'Local'; }
       }
+
+      // ------------------ SCHEDULE / COUNTDOWN ------------------
+      const scheduleWeek = [
+        { name: 'Homeroom', start: '08:00', end: '08:15' },
+        { name: '1st Block', start: '08:20', end: '09:25' },
+        { name: '2nd Block', start: '09:30', end: '10:35' },
+        { name: '3rd Block', start: '10:40', end: '11:45' },
+        { name: '4th Block', start: '11:45', end: '12:20' },
+        { name: '5th Block', start: '12:25', end: '13:30' },
+        { name: '6th Block', start: '13:35', end: '14:45' },
+      ];
+      const scheduleFri = [
+        { name: 'Homeroom', start: '08:00', end: '08:15' },
+        { name: '1st Block', start: '08:20', end: '09:25' },
+        { name: '2nd Block', start: '09:30', end: '10:35' },
+        { name: '3rd Block', start: '10:40', end: '11:35' }, // School ends after this
+      ];
+
+      const nowBlockEl = document.getElementById('nowBlock');
+      const countdownEl = document.getElementById('countdown');
+      const nextBlockEl = document.getElementById('nextBlock');
+
+      function parseHM(baseDate, hm){
+        const [H,M] = hm.split(':').map(n=>parseInt(n,10));
+        const d = new Date(baseDate);
+        d.setHours(H, M, 0, 0);
+        return d;
+      }
+
+      function fmtDur(ms){
+        if(ms <= 0) return '00:00';
+        const total = Math.floor(ms/1000);
+        const h = Math.floor(total/3600);
+        const m = Math.floor((total%3600)/60);
+        const s = total%60;
+        const pad = n => String(n).padStart(2,'0');
+        return (h>0? pad(h)+':':'') + pad(m)+':'+pad(s);
+      }
+
+      function updateSchedule(){
+        const now = new Date(Date.now()+offsetMs);
+        const isFriday = now.getDay() === 5; // 0=Sun
+        const sched = isFriday ? scheduleFri : scheduleWeek;
+
+        let current = null; let next = null;
+        for(let i=0;i<sched.length;i++){
+          const s = parseHM(now, sched[i].start);
+          const e = parseHM(now, sched[i].end);
+          if(now >= s && now < e){
+            current = { ...sched[i], s, e };
+            next = sched[i+1] ? { ...sched[i+1], s: parseHM(now, sched[i+1].start), e: parseHM(now, sched[i+1].end) } : null;
+            break;
+          }
+          if(now < s){
+            next = { ...sched[i], s, e };
+            break;
+          }
+        }
+
+        if(current){
+          const remaining = current.e - now;
+          nowBlockEl.textContent = `${current.name} ends in`;
+          countdownEl.textContent = fmtDur(remaining);
+          nextBlockEl.textContent = next ? `Next: ${next.name} at ${next.s.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}` : (isFriday ? 'School day ends after this block' : 'Next: —');
+        } else if(next){
+          const until = next.s - now;
+          nowBlockEl.textContent = `${next.name} starts in`;
+          countdownEl.textContent = fmtDur(until);
+          nextBlockEl.textContent = `Starts at ${next.s.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+        } else {
+          nowBlockEl.textContent = 'School day is over';
+          countdownEl.textContent = '—';
+          nextBlockEl.textContent = '';
+        }
+      }
+
+      // tick schedule every second
+      setInterval(updateSchedule, 1000);
 
       // ---- Boot ----
       initInfo();
