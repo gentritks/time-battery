@@ -57,6 +57,25 @@
       60%,100%{transform:rotate(0deg)}
     }
 
+    /* Low-battery alert visuals */
+    .status.crit{ color: var(--crit); }
+    .card.low-battery{
+      border-color: var(--crit);
+      box-shadow: 0 0 0 0 rgba(255,59,48,.45), 0 10px 30px rgba(0,0,0,.25);
+      animation: lowPulse 1.6s ease-in-out infinite;
+    }
+    @keyframes lowPulse{
+      0%{ box-shadow: 0 0 0 0 rgba(255,59,48,.45), 0 10px 30px rgba(0,0,0,.25); }
+      70%{ box-shadow: 0 0 0 14px rgba(255,59,48,0), 0 10px 30px rgba(0,0,0,.25); }
+      100%{ box-shadow: 0 0 0 0 rgba(255,59,48,0), 0 10px 30px rgba(0,0,0,.25); }
+    }
+
+    /* Respect reduced motion preferences */
+    @media (prefers-reduced-motion: reduce){
+      .ring{ animation: none !important; }
+      .card.low-battery{ animation: none !important; }
+    }
+
     .footer{margin-top:28px;color:var(--muted);font-size:12px;opacity:.85}
     a{color:var(--accent);text-decoration:none}
     a:hover{text-decoration:underline}
@@ -64,14 +83,14 @@
 </head>
 <body>
   <main class="wrap" role="main">
-    <section class="time" aria-live="polite">
+    <section class="time">
       <div class="clock" id="clock">--:--:--</div>
       <div class="date" id="date">Loading date…</div>
     </section>
 
-    <section class="grid" aria-live="polite">
+    <section class="grid">
       <!-- Battery -->
-      <div class="card">
+      <div class="card" id="batteryCard">
         <div class="label">Battery</div>
         <div class="battery" aria-label="Battery" role="img">
           <svg viewBox="0 0 520 240" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -89,6 +108,7 @@
         <div class="percent" id="percent">—%</div>
         <div class="status" id="bStatus">Detecting battery…</div>
         <div class="status hidden" id="unsupported">Battery status isn’t available on this device or in this browser.</div>
+        <div class="status crit hidden" id="lowNote">Charge soon</div>
         <div class="sr-only" id="srBattery" aria-live="polite"></div>
       </div>
 
@@ -141,6 +161,12 @@
       const unsupportedEl = document.getElementById('unsupported');
       const srBattery     = document.getElementById('srBattery');
       const boltEl        = document.getElementById('bolt');
+      // Normalize any placeholder mojibake at runtime
+      try {
+        if (percentEl) percentEl.textContent = '--%';
+        if (statusEl) statusEl.textContent = 'Detecting battery…';
+        if (unsupportedEl) unsupportedEl.textContent = 'Battery status isn\u2019t available on this device or in this browser.';
+      } catch(_) {}
 
       function setFill(pct){
         const w = Math.max(0, Math.min(454 * (pct/100), 454));
@@ -182,6 +208,19 @@
               ? (battery.chargingTime === Infinity ? '' : ('· full in ' + humanTime(battery.chargingTime)))
               : (battery.dischargingTime === Infinity ? '' : ('· left ' + humanTime(battery.dischargingTime)));
             statusEl.textContent = (battery.charging ? 'Charging ' : 'On battery ') + timeStr;
+            // Normalize wording and add low-battery UI
+            try {
+              const fixed = battery.charging
+                ? (battery.chargingTime === Infinity ? 'Charging' : ('Charging until full ' + humanTime(battery.chargingTime)))
+                : ('On battery ' + (battery.dischargingTime === Infinity ? '' : ('remaining ' + humanTime(battery.dischargingTime))));
+              statusEl.textContent = fixed.trim();
+              const pct = Math.round(battery.level * 100);
+              const batteryCard = document.getElementById('batteryCard');
+              const lowNoteEl = document.getElementById('lowNote');
+              const isLow = pct <= 20 && !battery.charging;
+              if (batteryCard) batteryCard.classList.toggle('low-battery', isLow);
+              if (lowNoteEl) lowNoteEl.classList.toggle('hidden', !isLow);
+            } catch(_) {}
             srBattery.textContent = `Battery ${pct} percent ${battery.charging ? 'and charging' : ''}`;
             unsupportedEl.classList.add('hidden');
             statusEl.classList.remove('hidden');
@@ -287,6 +326,7 @@
         } else {
           nowLineEl.textContent = 'No active classes';
           bigTimerEl.textContent = '—';
+          bigTimerEl.textContent = '--:--';
           pfillEl.style.width = '100%';
           pcentEl.textContent = '100%';
           nextLineEl.textContent = '';
@@ -294,8 +334,91 @@
           bellEl.classList.remove('ring');
         }
       }
-      updateCountdowns();
-      setInterval(updateCountdowns, 1000);
+      // Enhanced countdown: weekends/after-school show next school start
+      function updateCountdownsSchoolAware(){
+        const now = new Date();
+        const getSchedFor = (d) => {
+          const wd = d.getDay();
+          if (wd === 5) return fridaySchedule;
+          if (wd >= 1 && wd <= 4) return weekdaySchedule;
+          return [];
+        };
+        const combine = (d, hm) => { const [H,M] = hm.split(':').map(Number); const c = new Date(d); c.setHours(H,M,0,0); return c; };
+        const prevSchoolDate = (d) => { const c=new Date(d); c.setHours(0,0,0,0); do{ c.setDate(c.getDate()-1);} while(getSchedFor(c).length===0); return c; };
+        const nextSchoolDate = (d) => { const c=new Date(d); c.setHours(0,0,0,0); do{ c.setDate(c.getDate()+1);} while(getSchedFor(c).length===0); return c; };
+
+        const sched = getSchedFor(now);
+        let active = null, next = null;
+        for (let i=0;i<sched.length;i++){
+          const s = parseHM(sched[i].start), e = parseHM(sched[i].end);
+          if (now >= s && now < e) { active = { ...sched[i], s, e }; next = sched[i+1] ? { ...sched[i+1], s: parseHM(sched[i+1].start) } : null; break; }
+          if (now < s) { next = { ...sched[i], s }; break; }
+        }
+
+        if (active){
+          const total = active.e - active.s;
+          const left  = active.e - now;
+          const done  = Math.max(0, Math.min(1, (now - active.s) / total));
+          nowLineEl.textContent = `${active.name} ends in`;
+          bigTimerEl.textContent = humanClock(left);
+          pfillEl.style.width = (done*100).toFixed(1) + '%';
+          pcentEl.textContent = Math.round(done*100) + '%';
+          nextLineEl.textContent = next ? `Next: ${next.name} at ${next.s.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}` : '';
+          if (left > 0 && left <= 30000) { bellEl.classList.remove('hidden'); bellEl.classList.add('ring'); }
+          else { bellEl.classList.add('hidden'); bellEl.classList.remove('ring'); }
+          return;
+        }
+
+        if (next && sched.length){
+          const until = next.s - now;
+          nowLineEl.textContent = `${next.name} starts in`;
+          bigTimerEl.textContent = humanClock(until);
+          pfillEl.style.width = '0%';
+          pcentEl.textContent = '0%';
+          nextLineEl.textContent = `Starts at ${next.s.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+          bellEl.classList.add('hidden');
+          bellEl.classList.remove('ring');
+          return;
+        }
+
+        // Weekend or after-school
+        const lastSchool = prevSchoolDate(now);
+        const todayEnd = sched.length ? combine(now, sched[sched.length-1].end) : null;
+        const nextSchool = (sched.length && todayEnd && now < todayEnd) ? now : nextSchoolDate(now);
+        const nextSched  = getSchedFor(nextSchool);
+        const prevSched  = getSchedFor(lastSchool);
+        const prevEnd  = combine(lastSchool, prevSched[prevSched.length-1].end);
+        const nextStart = combine(nextSchool, nextSched[0].start);
+        const until = nextStart - now;
+        const total = nextStart - prevEnd;
+        const done  = Math.max(0, Math.min(1, (now - prevEnd) / total));
+        nowLineEl.textContent = 'School starts in';
+        bigTimerEl.textContent = humanClock(until);
+        pfillEl.style.width = (done*100).toFixed(1) + '%';
+        pcentEl.textContent = Math.round(done*100) + '%';
+        const weekdayName = nextStart.toLocaleDateString([], {weekday:'long'});
+        const timeStr = nextStart.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        nextLineEl.textContent = `Starts ${weekdayName} ${timeStr}`;
+        if (until > 0 && until <= 30000) { bellEl.classList.remove('hidden'); bellEl.classList.add('ring'); }
+        else { bellEl.classList.add('hidden'); bellEl.classList.remove('ring'); }
+      }
+
+      updateCountdownsSchoolAware();
+      setInterval(updateCountdownsSchoolAware, 1000);
+
+      // ---------- Wake Lock (screen) ----------
+      async function requestWakeLock(){
+        try{
+          if (!('wakeLock' in navigator)) return;
+          await navigator.wakeLock.request('screen');
+          document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible') {
+              try { await navigator.wakeLock.request('screen'); } catch(_) {}
+            }
+          });
+        } catch(_) {}
+      }
+      requestWakeLock();
     })();
   </script>
 </body>
