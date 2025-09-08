@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Time & Battery</title>
+  <title></title>
+  <!-- Favicon: replace favicon.svg with your logo if desired -->
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <meta name="description" content="Large clock with battery status and class countdowns for kiosk mode." />
   <style>
     :root{
@@ -154,6 +156,23 @@
       tickClock();
       setInterval(tickClock, 1000);
 
+      // ---------- Tab Title (24h time + battery %) ----------
+      let tabBatteryPct = null; // null = unknown
+      function updateTabTitle(){
+        const now = new Date();
+        const t = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', hour12:false});
+        const pctStr = (tabBatteryPct == null) ? '--%' : (tabBatteryPct + '%');
+        document.title = t + ' - ' + pctStr;
+      }
+      // Set initial title immediately
+      updateTabTitle();
+      // Keep time updated in the title, aligned to minute boundaries
+      (function scheduleTitleTick(){
+        const now = new Date();
+        const delay = (60 - now.getSeconds())*1000 - now.getMilliseconds();
+        setTimeout(() => { updateTabTitle(); scheduleTitleTick(); }, Math.max(500, delay));
+      })();
+
       // ---------- Battery (robust; handles missing/never-resolving API) ----------
       const fillEl        = document.getElementById('fill');
       const percentEl     = document.getElementById('percent');
@@ -184,6 +203,8 @@
       }
       async function initBattery(){
         if (!('getBattery' in navigator)) {
+          tabBatteryPct = null; // unknown
+          updateTabTitle();
           unsupportedEl.classList.remove('hidden');
           statusEl.classList.add('hidden');
           return;
@@ -203,6 +224,8 @@
             const pct = Math.round(battery.level * 100);
             percentEl.textContent = pct + '%';
             setFill(pct);
+            tabBatteryPct = pct;
+            updateTabTitle();
             boltEl.classList.toggle('hidden', !battery.charging);
             const timeStr = battery.charging
               ? (battery.chargingTime === Infinity ? '' : ('· full in ' + humanTime(battery.chargingTime)))
@@ -232,6 +255,8 @@
           battery.addEventListener('dischargingtimechange', render);
         } catch (e) {
           console.error('Battery API error', e);
+          tabBatteryPct = null;
+          updateTabTitle();
           unsupportedEl.classList.remove('hidden');
           statusEl.classList.add('hidden');
         } finally {
