@@ -9,6 +9,7 @@ A single‑file webpage for kiosk setups that shows a large clock, battery statu
 - Low‑battery alert (≤ 20%): subtle pulse + "Charge soon" note
 - Class countdowns with progress bar (Mon–Thu and Friday schedules)
 - Weekend/after‑school: countdown to the next school start with progress across the off‑school period
+- Rules-first navigation with quick links to KLA Mail, KLA Platform, and GradeLink
 - Reduced motion support (disables animations if preferred)
 - Best‑effort screen Wake Lock to prevent sleep in kiosk mode
 
@@ -19,10 +20,7 @@ A single‑file webpage for kiosk setups that shows a large clock, battery statu
 
 ## Configure Schedules
 
-Edit the arrays in `index.html` to match your timetable:
-
-- Weekdays (Mon–Thu): `index.html:245`
-- Friday: `index.html:255`
+Edit the `weekdaySchedule` and `fridaySchedule` arrays in `index.html` to match your timetable.
 
 Each item uses `name`, `start`, and `end` in `HH:MM` 24‑hour format.
 

@@ -33,10 +33,12 @@
     body.rules-active{height:auto;min-height:100%;align-items:flex-start;overflow-y:visible}
     .wrap{width:min(1100px,100%);text-align:center}
     .view-switcher{
-      display:inline-flex;gap:6px;margin-bottom:clamp(24px,4vh,42px);padding:6px;
+      display:inline-flex;flex-wrap:wrap;justify-content:center;gap:6px;
+      max-width:100%;margin-bottom:clamp(24px,4vh,42px);padding:6px;
       border:1px solid #243044;border-radius:14px;background:#0f1620;
       box-shadow:0 10px 30px rgba(0,0,0,.22);
     }
+    .local-tabs{display:flex;gap:6px}
     .view-button{
       min-width:112px;border:0;border-radius:9px;padding:11px 22px;
       background:transparent;color:var(--muted);font:inherit;font-size:15px;font-weight:700;
@@ -44,6 +46,8 @@
     }
     .view-button:hover{color:var(--fg);background:#151f2c}
     .view-button:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+    a.view-button{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+    a.view-button:hover{text-decoration:none}
     .view-button[aria-selected="true"]{
       color:#07111c;background:var(--accent);box-shadow:0 5px 16px rgba(77,163,255,.28);
     }
@@ -167,9 +171,14 @@
 </head>
 <body class="rules-active">
   <main class="wrap" role="main">
-    <nav class="view-switcher" role="tablist" aria-label="Page views">
-      <button class="view-button" id="timeTab" type="button" role="tab" aria-selected="false" aria-controls="timePanel" tabindex="-1">Time</button>
-      <button class="view-button" id="rulesTab" type="button" role="tab" aria-selected="true" aria-controls="rulesPanel">Rules</button>
+    <nav class="view-switcher" aria-label="Page views and school links">
+      <div class="local-tabs" role="tablist" aria-label="Page views">
+        <button class="view-button" id="rulesTab" type="button" role="tab" aria-selected="true" aria-controls="rulesPanel">Rules</button>
+        <button class="view-button" id="timeTab" type="button" role="tab" aria-selected="false" aria-controls="timePanel" tabindex="-1">Time</button>
+      </div>
+      <a class="view-button" href="https://mail.google.com/a/kla.education" target="_blank" rel="noopener noreferrer">Mail</a>
+      <a class="view-button" href="https://app.kla.education/login/" target="_blank" rel="noopener noreferrer">KLA Platform</a>
+      <a class="view-button" href="https://secure.gradelink.com/lkg/Gradelink.xml?SchoolID=2489" target="_blank" rel="noopener noreferrer">GradeLink</a>
     </nav>
 
     <div class="view-panel" id="timePanel" role="tabpanel" aria-labelledby="timeTab" hidden>
@@ -462,20 +471,28 @@
       // ---------- Class Countdowns (Mon–Thu vs Friday) ----------
       // Mon–Thu
       const weekdaySchedule = [
-        {name:'Homeroom', start:'08:00', end:'08:15'},
-        {name:'1st Block', start:'08:20', end:'09:25'},
-        {name:'2nd Block', start:'09:30', end:'10:35'},
-        {name:'3rd Block', start:'10:40', end:'11:45'},
-        {name:'4th Block', start:'11:45', end:'12:20'},
-        {name:'5th Block', start:'12:25', end:'13:30'},
-        {name:'6th Block', start:'13:35', end:'14:45'},
+        {name:'Students may enter the building', start:'07:45', end:'08:00'},
+        {name:'Warning & Anthem', start:'08:00', end:'08:15'},
+        {name:'Block 1', start:'08:20', end:'09:15'},
+        {name:'Block 2', start:'09:20', end:'10:15'},
+        {name:'Block 3', start:'10:20', end:'11:15'},
+        {name:'Block 4 / Middle School Lunch', start:'11:20', end:'11:55'},
+        {name:'Short Bell — Middle School Block 4', start:'11:55', end:'12:00'},
+        {name:'Middle School Block 4', start:'12:00', end:'12:15'},
+        {name:'High School Lunch — short bell at 12:15', start:'12:15', end:'12:55'},
+        {name:'Block 5', start:'13:00', end:'13:50'},
+        {name:'Block 6', start:'13:55', end:'14:50'},
+        {name:'Dismissal — students out or in designated activities by 3:05', start:'14:50', end:'15:05'},
       ];
       // Friday (no “day ends after this block” text—intentionally left blank)
       const fridaySchedule = [
-        {name:'Homeroom', start:'08:00', end:'08:15'},
-        {name:'1st Block', start:'08:20', end:'09:25'},
-        {name:'2nd Block', start:'09:30', end:'10:35'},
-        {name:'3rd Block', start:'10:40', end:'11:35'},
+        {name:'Students may enter the building', start:'07:45', end:'08:00'},
+        {name:'Warning & Anthem', start:'08:00', end:'08:15'},
+        {name:'Block 1', start:'08:20', end:'09:15'},
+        {name:'Block 2', start:'09:20', end:'10:15'},
+        {name:'Block 3', start:'10:20', end:'11:15'},
+        {name:'Mentor Time', start:'11:20', end:'12:00'},
+        {name:'Dismissal', start:'12:00', end:'12:01'},
       ];
 
       const nowLineEl = document.getElementById('nowLine');
