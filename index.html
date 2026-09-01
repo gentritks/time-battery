@@ -178,7 +178,7 @@
       </div>
       <a class="view-button" href="https://mail.google.com/a/kla.education" target="_blank" rel="noopener noreferrer">Mail</a>
       <a class="view-button" href="https://app.kla.education/login/" target="_blank" rel="noopener noreferrer">KLA Platform</a>
-      <a class="view-button" href="https://secure.gradelink.com/lkg/Gradelink.xml?SchoolID=2489" target="_blank" rel="noopener noreferrer">GradeLink</a>
+      <a class="view-button" href="https://secure.gradelink.com/lkg/Gradelink.xml?SchoolID=2489" target="_blank" rel="noopener noreferrer">Gradelink</a>
     </nav>
 
     <div class="view-panel" id="timePanel" role="tabpanel" aria-labelledby="timeTab" hidden>
@@ -430,16 +430,16 @@
             tabBatteryPct = pct;
             updateTabTitle();
             boltEl.classList.toggle('hidden', !battery.charging);
-            const timeStr = battery.charging
-              ? (battery.chargingTime === Infinity ? '' : ('· full in ' + humanTime(battery.chargingTime)))
-              : (battery.dischargingTime === Infinity ? '' : ('· left ' + humanTime(battery.dischargingTime)));
-            statusEl.textContent = (battery.charging ? 'Charging ' : 'On battery ') + timeStr;
-            // Normalize wording and add low-battery UI
+            // Keep status wording natural across full, charging, and discharging states.
             try {
               const fixed = battery.charging
-                ? (battery.chargingTime === Infinity ? 'Charging' : ('Charging until full ' + humanTime(battery.chargingTime)))
-                : ('On battery ' + (battery.dischargingTime === Infinity ? '' : ('remaining ' + humanTime(battery.dischargingTime))));
-              statusEl.textContent = fixed.trim();
+                ? (pct >= 100
+                    ? 'Fully charged'
+                    : (battery.chargingTime === Infinity ? 'Charging' : ('Charging — full in ' + humanTime(battery.chargingTime))))
+                : (battery.dischargingTime === Infinity
+                    ? 'On battery'
+                    : ('On battery — ' + humanTime(battery.dischargingTime) + ' remaining'));
+              statusEl.textContent = fixed;
               const pct = Math.round(battery.level * 100);
               const batteryCard = document.getElementById('batteryCard');
               const lowNoteEl = document.getElementById('lowNote');
@@ -479,7 +479,7 @@
         {name:'Block 4 / Middle School Lunch', start:'11:20', end:'11:55'},
         {name:'Short Bell — Middle School Block 4', start:'11:55', end:'12:00'},
         {name:'Middle School Block 4', start:'12:00', end:'12:15'},
-        {name:'High School Lunch — short bell at 12:15', start:'12:15', end:'12:55'},
+        {name:'High School Lunch — short bell', start:'12:15', end:'12:55'},
         {name:'Block 5', start:'13:00', end:'13:50'},
         {name:'Block 6', start:'13:55', end:'14:50'},
         {name:'Dismissal — students out or in designated activities by 3:05', start:'14:50', end:'15:05'},
@@ -534,7 +534,7 @@
           const total = active.e - active.s;
           const left  = active.e - now;
           const done  = Math.max(0, Math.min(1, (now - active.s) / total));
-          nowLineEl.textContent = `${active.name} ends in`;
+          nowLineEl.textContent = `${active.name} — time remaining`;
           bigTimerEl.textContent = humanClock(left);
           pfillEl.style.width = (done*100).toFixed(1) + '%';
           pcentEl.textContent = Math.round(done*100) + '%';
@@ -595,7 +595,7 @@
           const total = active.e - active.s;
           const left  = active.e - now;
           const done  = Math.max(0, Math.min(1, (now - active.s) / total));
-          nowLineEl.textContent = `${active.name} ends in`;
+          nowLineEl.textContent = `${active.name} — time remaining`;
           bigTimerEl.textContent = humanClock(left);
           pfillEl.style.width = (done*100).toFixed(1) + '%';
           pcentEl.textContent = Math.round(done*100) + '%';
@@ -634,7 +634,7 @@
         pcentEl.textContent = Math.round(done*100) + '%';
         const weekdayName = nextStart.toLocaleDateString([], {weekday:'long'});
         const timeStr = nextStart.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-        nextLineEl.textContent = `Starts ${weekdayName} ${timeStr}`;
+        nextLineEl.textContent = `Starts on ${weekdayName} at ${timeStr}`;
         if (until > 0 && until <= 30000) { bellEl.classList.remove('hidden'); bellEl.classList.add('ring'); }
         else { bellEl.classList.add('hidden'); bellEl.classList.remove('ring'); }
       }
