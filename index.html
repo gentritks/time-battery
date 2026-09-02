@@ -228,6 +228,7 @@
             <div class="pcent" id="pcent">0%</div>
           </div>
           <div class="count-meta" id="nextLine" style="margin-top:8px;">—</div>
+          <div class="count-meta" id="scheduleNote" hidden></div>
         </div>
       </div>
     </section>
@@ -483,7 +484,7 @@
         {name:'High School Lunch — short bell', start:'12:15', end:'12:55'},
         {name:'Block 5', start:'13:00', end:'13:55'},
         {name:'Block 6', start:'14:00', end:'14:50'},
-        {name:'Dismissal — students out or in designated activities by 3:05', start:'14:50', end:'15:05'},
+        {name:'Dismissal', start:'14:50', end:'15:05', note:'By 15:05, students must leave the building or be in designated activities.'},
       ];
       // Friday (no “day ends after this block” text—intentionally left blank)
       const fridaySchedule = [
@@ -499,9 +500,16 @@
       const nowLineEl = document.getElementById('nowLine');
       const bigTimerEl = document.getElementById('bigTimer');
       const nextLineEl = document.getElementById('nextLine');
+      const scheduleNoteEl = document.getElementById('scheduleNote');
       const pfillEl = document.getElementById('pfill');
       const pcentEl = document.getElementById('pcent');
       const bellEl = document.getElementById('bell');
+
+      function updateScheduleNote(active, next){
+        const note = (active && active.note) || (next && next.note) || '';
+        scheduleNoteEl.textContent = note;
+        scheduleNoteEl.hidden = !note;
+      }
 
       function parseHM(hm){
         const [H,M] = hm.split(':').map(Number);
@@ -531,6 +539,7 @@
           if (now < s) { next = { ...sched[i], s }; break; }
         }
 
+        updateScheduleNote(active, next);
         if (active){
           const total = active.e - active.s;
           const left  = active.e - now;
@@ -540,7 +549,7 @@
           pfillEl.style.width = (done*100).toFixed(1) + '%';
           pcentEl.textContent = Math.round(done*100) + '%';
           nextLineEl.textContent = next
-            ? `Next: ${next.name} at ${next.s.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`
+            ? `Next: ${next.name} at ${next.start}`
             : ''; // no “day ends…” text by request
 
           // Bell in last 30s
@@ -592,6 +601,7 @@
           if (now < s) { next = { ...sched[i], s }; break; }
         }
 
+        updateScheduleNote(active, next);
         if (active){
           const total = active.e - active.s;
           const left  = active.e - now;
@@ -600,7 +610,7 @@
           bigTimerEl.textContent = humanClock(left);
           pfillEl.style.width = (done*100).toFixed(1) + '%';
           pcentEl.textContent = Math.round(done*100) + '%';
-          nextLineEl.textContent = next ? `Next: ${next.name} at ${next.s.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}` : '';
+          nextLineEl.textContent = next ? `Next: ${next.name} at ${next.start}` : '';
           if (left > 0 && left <= 30000) { bellEl.classList.remove('hidden'); bellEl.classList.add('ring'); }
           else { bellEl.classList.add('hidden'); bellEl.classList.remove('ring'); }
           return;
