@@ -9,7 +9,7 @@ A single‑file webpage for kiosk setups that shows a large clock, battery statu
 - Low‑battery alert (≤ 20%): subtle pulse + "Charge soon" note
 - Class countdowns with progress bar (Mon–Thu and Friday schedules)
 - Weekend/after‑school: countdown to the next school start with progress across the off‑school period
-- Rules-first navigation with quick links to KLA Mail, KLA Platform, and Gradelink
+- Rules-first navigation with quick links to KLA Mail, KLA Platform, Gradelink, and MAP Testing
 - Reduced motion support (disables animations if preferred)
 - Best‑effort screen Wake Lock to prevent sleep in kiosk mode
 
